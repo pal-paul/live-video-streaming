@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Live Camera Broadcast</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          Oxygen, Ubuntu, Cantarell, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+
+      .header {
+        background: white;
+        padding: 20px 30px;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+      }
+
+      .header h1 {
+        color: #333;
+        font-size: 24px;
+        margin-bottom: 5px;
+      }
+
+      .header p {
+        color: #666;
+        font-size: 14px;
+      }
+
+      .broadcast-panel {
+        background: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+      }
+
+      .video-container {
+        background: #000;
+        border-radius: 8px;
+        overflow: hidden;
+        margin-bottom: 20px;
+        position: relative;
+        padding-bottom: 56.25%; /* 16:9 aspect ratio */
+      }
+
+      .video-container video {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        transform: scaleX(-1); /* Mirror the camera preview */
+      }
+
+      .controls {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+
+      .btn {
+        padding: 12px 24px;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+        flex: 1;
+      }
+
+      .btn-primary {
+        background: #667eea;
+        color: white;
+      }
+
+      .btn-primary:hover {
+        background: #5568d3;
+      }
+
+      .btn-danger {
+        background: #ef4444;
+        color: white;
+      }
+
+      .btn-danger:hover {
+        background: #dc2626;
+      }
+
+      .btn-success {
+        background: #10b981;
+        color: white;
+      }
+
+      .btn-success:hover {
+        background: #059669;
+      }
+
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .status {
+        padding: 15px;
+        background: #f3f4f6;
+        border-radius: 6px;
+        margin-bottom: 20px;
+      }
+
+      .status-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid #e5e7eb;
+      }
+
+      .status-item:last-child {
+        border-bottom: none;
+      }
+
+      .status-label {
+        font-weight: 600;
+        color: #374151;
+      }
+
+      .status-value {
+        color: #6b7280;
+      }
+
+      .status-badge {
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .status-idle {
+        background: #e5e7eb;
+        color: #374151;
+      }
+
+      .status-recording {
+        background: #fef3c7;
+        color: #92400e;
+      }
+
+      .status-broadcasting {
+        background: #dcfce7;
+        color: #166534;
+      }
+
+      .error-message {
+        background: #fee2e2;
+        color: #dc2626;
+        padding: 15px;
+        border-radius: 6px;
+        margin-bottom: 20px;
+        display: none;
+      }
+
+      .recording-indicator {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        background: rgba(239, 68, 68, 0.9);
+        color: white;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 14px;
+        font-weight: 600;
+        display: none;
+        align-items: center;
+        gap: 8px;
+        z-index: 10;
+      }
+
+      .recording-dot {
+        width: 10px;
+        height: 10px;
+        background: white;
+        border-radius: 50%;
+        animation: pulse 1.5s ease-in-out infinite;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.3;
+        }
+      }
+
+      .info-box {
+        background: #eff6ff;
+        border-left: 4px solid #3b82f6;
+        padding: 15px;
+        border-radius: 6px;
+        margin-top: 20px;
+      }
+
+      .info-box h4 {
+        color: #1e40af;
+        margin-bottom: 8px;
+      }
+
+      .info-box p {
+        color: #1e3a8a;
+        font-size: 14px;
+        line-height: 1.6;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>📹 Live Camera Broadcast</h1>
+        <p>
+          Broadcast live from your camera and save recordings to cloud storage
+        </p>
+      </div>
+
+      <div class="broadcast-panel">
+        <div class="error-message" id="errorMessage"></div>
+
+        <div class="video-container">
+          <div class="recording-indicator" id="recordingIndicator">
+            <div class="recording-dot"></div>
+            <span>REC</span>
+          </div>
+          <video id="cameraPreview" autoplay muted playsinline></video>
+        </div>
+
+        <div class="controls">
+          <button
+            class="btn btn-primary"
+            id="startCameraBtn"
+            onclick="startCamera()"
+          >
+            Start Camera
+          </button>
+          <button
+            class="btn btn-success"
+            id="startRecordingBtn"
+            onclick="startRecording()"
+            disabled
+          >
+            Start Recording
+          </button>
+          <button
+            class="btn btn-danger"
+            id="stopRecordingBtn"
+            onclick="stopRecording()"
+            disabled
+          >
+            Stop Recording
+          </button>
+        </div>
+
+        <div class="status">
+          <div class="status-item">
+            <span class="status-label">Status:</span>
+            <span class="status-badge status-idle" id="statusBadge">Idle</span>
+          </div>
+          <div class="status-item">
+            <span class="status-label">Recording Duration:</span>
+            <span class="status-value" id="recordingDuration">00:00:00</span>
+          </div>
+          <div class="status-item">
+            <span class="status-label">Stream ID:</span>
+            <span class="status-value" id="streamId">--</span>
+          </div>
+        </div>
+
+        <div class="info-box">
+          <h4>ℹ️ How it works</h4>
+          <p>
+            1. Click "Start Camera" to access your webcam and microphone<br />
+            2. Click "Start Recording" to go live via WebRTC connection<br />
+            3. Your camera stream is sent to the server for real-time
+            transcoding<br />
+            4. FFmpeg converts your stream to HLS format for adaptive bitrate
+            delivery<br />
+            5. Click "Stop Recording" to end the broadcast<br />
+            6. Recording is automatically saved to cloud storage in HLS format
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let mediaStream = null;
+      let peerConnection = null;
+      let currentStreamId = null;
+      let recordingStartTime = null;
+      let durationInterval = null;
+
+      async function startCamera() {
+        try {
+          console.log("Starting camera...");
+
+          // Check if getUserMedia is supported
+          if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error(
+              "getUserMedia is not supported in this browser. Please use HTTPS or localhost."
+            );
+          }
+
+          console.log("Requesting camera and microphone access...");
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              width: { ideal: 1920 },
+              height: { ideal: 1080 },
+              facingMode: "user",
+            },
+            audio: true,
+          });
+
+          console.log("Camera access granted, setting up preview...");
+          mediaStream = stream;
+          const preview = document.getElementById("cameraPreview");
+          preview.srcObject = stream;
+
+          document.getElementById("startCameraBtn").disabled = true;
+          document.getElementById("startRecordingBtn").disabled = false;
+
+          updateStatus("Camera Ready");
+          hideError();
+          console.log("Camera ready!");
+        } catch (error) {
+          console.error("Camera access error:", error);
+          let errorMessage = "Failed to access camera: " + error.message;
+
+          // Provide helpful error messages
+          if (
+            error.name === "NotAllowedError" ||
+            error.name === "PermissionDeniedError"
+          ) {
+            errorMessage =
+              "Camera permission denied. Please allow camera and microphone access in your browser settings.";
+          } else if (
+            error.name === "NotFoundError" ||
+            error.name === "DevicesNotFoundError"
+          ) {
+            errorMessage =
+              "No camera or microphone found. Please connect a camera and microphone.";
+          } else if (
+            error.name === "NotReadableError" ||
+            error.name === "TrackStartError"
+          ) {
+            errorMessage =
+              "Camera is already in use by another application. Please close other apps using the camera.";
+          } else if (
+            error.name === "OverconstrainedError" ||
+            error.name === "ConstraintNotSatisfiedError"
+          ) {
+            errorMessage =
+              "Camera doesn't support the requested settings. Trying with default settings...";
+
+            // Try again with simpler constraints
+            try {
+              const simpleStream = await navigator.mediaDevices.getUserMedia({
+                video: true,
+                audio: true,
+              });
+
+              mediaStream = simpleStream;
+              const preview = document.getElementById("cameraPreview");
+              preview.srcObject = simpleStream;
+
+              document.getElementById("startCameraBtn").disabled = true;
+              document.getElementById("startRecordingBtn").disabled = false;
+
+              updateStatus("Camera Ready");
+              hideError();
+              console.log("Camera ready with default settings!");
+              return;
+            } catch (retryError) {
+              errorMessage =
+                "Failed to access camera even with default settings: " +
+                retryError.message;
+            }
+          } else if (error.message && error.message.includes("https")) {
+            errorMessage =
+              "Camera access requires HTTPS. Please access this page via https:// or use localhost.";
+          }
+
+          showError(errorMessage);
+        }
+      }
+
+      async function startRecording() {
+        if (!mediaStream) {
+          showError("Please start camera first");
+          return;
+        }
+
+        try {
+          // Create a stream first to get the stream ID
+          const createResponse = await fetch("/api/v1/streams", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              video_url: "webrtc://live",
+              hls_playlist_url: "",
+            }),
+          });
+
+          if (!createResponse.ok) {
+            throw new Error("Failed to create stream");
+          }
+
+          const streamData = await createResponse.json();
+          currentStreamId = streamData.stream_id;
+
+          // Initialize WebRTC peer connection
+          await setupWebRTCConnection();
+
+          // Start the stream
+          await fetch(`/api/v1/streams/${currentStreamId}/start`, {
+            method: "POST",
+          });
+
+          document.getElementById("streamId").textContent = currentStreamId;
+          document.getElementById("startRecordingBtn").disabled = true;
+          document.getElementById("stopRecordingBtn").disabled = false;
+          document.getElementById("recordingIndicator").style.display = "flex";
+
+          recordingStartTime = Date.now();
+          startDurationTimer();
+          updateStatus("🔴 LIVE");
+          hideError();
+
+          console.log("Live broadcast started, Stream ID:", currentStreamId);
+          showSuccess(
+            `🔴 You are now LIVE!<br>` +
+              `Stream ID: ${currentStreamId}<br>` +
+              `<a href="/watch/${currentStreamId}" target="_blank" style="color: #1e40af; text-decoration: underline;">Share this link with viewers</a>`
+          );
+        } catch (error) {
+          console.error("Recording start error:", error);
+          showError("Failed to start recording: " + error.message);
+        }
+      }
+
+      async function setupWebRTCConnection() {
+        // Create RTCPeerConnection
+        peerConnection = new RTCPeerConnection({
+          iceServers: [
+            { urls: "stun:stun.l.google.com:19302" },
+            { urls: "stun:stun1.l.google.com:19302" },
+          ],
+        });
+
+        // Add local media tracks to peer connection
+        mediaStream.getTracks().forEach((track) => {
+          peerConnection.addTrack(track, mediaStream);
+        });
+
+        // Handle ICE candidates
+        peerConnection.onicecandidate = (event) => {
+          if (event.candidate) {
+            console.log("ICE candidate:", event.candidate);
+          }
+        };
+
+        peerConnection.oniceconnectionstatechange = () => {
+          console.log(
+            "ICE connection state:",
+            peerConnection.iceConnectionState
+          );
+        };
+
+        // Create offer from browser
+        const offer = await peerConnection.createOffer({
+          offerToReceiveAudio: false,
+          offerToReceiveVideo: false,
+        });
+
+        await peerConnection.setLocalDescription(offer);
+
+        // Wait for ICE gathering to complete
+        await waitForICEGathering();
+
+        console.log("Sending offer to server...");
+
+        // Send offer to server and get answer back
+        const offerResponse = await fetch(
+          `/api/v1/streams/${currentStreamId}/webrtc/offer`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sdp: peerConnection.localDescription.sdp }),
+          }
+        );
+
+        if (!offerResponse.ok) {
+          const errorData = await offerResponse.json();
+          throw new Error(
+            `Failed to send WebRTC offer: ${
+              errorData.error || offerResponse.statusText
+            }`
+          );
+        }
+
+        const { sdp: answerSDP } = await offerResponse.json();
+
+        // Set remote description with server's answer
+        await peerConnection.setRemoteDescription({
+          type: "answer",
+          sdp: answerSDP,
+        });
+
+        console.log("WebRTC connection established");
+      }
+
+      function waitForICEGathering() {
+        return new Promise((resolve) => {
+          if (peerConnection.iceGatheringState === "complete") {
+            resolve();
+          } else {
+            const checkState = () => {
+              if (peerConnection.iceGatheringState === "complete") {
+                peerConnection.removeEventListener(
+                  "icegatheringstatechange",
+                  checkState
+                );
+                resolve();
+              }
+            };
+            peerConnection.addEventListener(
+              "icegatheringstatechange",
+              checkState
+            );
+          }
+        });
+      }
+
+      async function streamChunkToViewers(chunk) {
+        // No longer needed - WebRTC handles streaming
+        // Keeping for backward compatibility
+        console.log("WebRTC is handling streaming");
+      }
+
+      function stopRecording() {
+        if (peerConnection) {
+          peerConnection.close();
+          peerConnection = null;
+        }
+
+        if (durationInterval) {
+          clearInterval(durationInterval);
+          durationInterval = null;
+        }
+
+        document.getElementById("stopRecordingBtn").disabled = true;
+        document.getElementById("recordingIndicator").style.display = "none";
+
+        updateStatus("Processing...");
+
+        // Stop the stream
+        stopBroadcast();
+      }
+
+      async function stopBroadcast() {
+        try {
+          if (currentStreamId) {
+            await fetch(`/api/v1/streams/${currentStreamId}/stop`, {
+              method: "POST",
+            });
+          }
+
+          updateStatus("Stream Ended");
+          showSuccess(
+            "Broadcast ended successfully! Recording saved to cloud."
+          );
+
+          // Reset UI
+          setTimeout(() => {
+            document.getElementById("startRecordingBtn").disabled = false;
+            document.getElementById("streamId").textContent = "--";
+            document.getElementById("recordingDuration").textContent =
+              "00:00:00";
+            updateStatus("Camera Ready");
+            currentStreamId = null;
+          }, 3000);
+        } catch (error) {
+          console.error("Stop broadcast error:", error);
+          showError("Failed to stop broadcast: " + error.message);
+        }
+      }
+
+      function startDurationTimer() {
+        durationInterval = setInterval(() => {
+          const elapsed = Date.now() - recordingStartTime;
+          const hours = Math.floor(elapsed / 3600000);
+          const minutes = Math.floor((elapsed % 3600000) / 60000);
+          const seconds = Math.floor((elapsed % 60000) / 1000);
+
+          document.getElementById("recordingDuration").textContent = `${String(
+            hours
+          ).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(
+            seconds
+          ).padStart(2, "0")}`;
+        }, 1000);
+      }
+
+      function updateStatus(status) {
+        const badge = document.getElementById("statusBadge");
+        badge.textContent = status;
+
+        badge.className = "status-badge";
+        if (status.includes("Recording")) {
+          badge.classList.add("status-broadcasting");
+        } else if (status.includes("Camera")) {
+          badge.classList.add("status-recording");
+        } else {
+          badge.classList.add("status-idle");
+        }
+      }
+
+      function showError(message) {
+        const errorEl = document.getElementById("errorMessage");
+        errorEl.textContent = message;
+        errorEl.style.display = "block";
+      }
+
+      function hideError() {
+        document.getElementById("errorMessage").style.display = "none";
+      }
+
+      function showSuccess(message) {
+        const errorEl = document.getElementById("errorMessage");
+        errorEl.innerHTML = message; // Use innerHTML to support HTML links
+        errorEl.style.display = "block";
+        errorEl.style.background = "#dcfce7";
+        errorEl.style.color = "#166534";
+
+        setTimeout(() => {
+          errorEl.style.display = "none";
+          errorEl.style.background = "#fee2e2";
+          errorEl.style.color = "#dc2626";
+        }, 8000); // Longer timeout for clickable links
+      }
+
+      // Cleanup on page unload
+      window.addEventListener("beforeunload", () => {
+        if (mediaStream) {
+          mediaStream.getTracks().forEach((track) => track.stop());
+        }
+      });
+    </script>
+  </body>
+</html>

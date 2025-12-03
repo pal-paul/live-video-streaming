@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ .title }}</title>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        background: #000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          Oxygen, Ubuntu, Cantarell, sans-serif;
+      }
+
+      .video-container {
+        position: relative;
+        width: 100%;
+        max-width: 1280px;
+        background: #000;
+      }
+
+      video {
+        width: 100%;
+        height: auto;
+        display: block;
+      }
+
+      .error-message {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(239, 68, 68, 0.95);
+        color: white;
+        padding: 20px 30px;
+        border-radius: 8px;
+        text-align: center;
+        display: none;
+        z-index: 10;
+      }
+
+      .loading {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: white;
+        font-size: 18px;
+      }
+
+      .live-badge {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        background: #ef4444;
+        color: white;
+        padding: 8px 16px;
+        border-radius: 4px;
+        font-weight: 600;
+        font-size: 14px;
+        display: none;
+        z-index: 5;
+      }
+
+      .live-badge::before {
+        content: "●";
+        margin-right: 6px;
+        animation: pulse 2s ease-in-out infinite;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="video-container">
+      <div class="loading" id="loading">Loading stream...</div>
+      <div class="error-message" id="errorMessage"></div>
+      <div class="live-badge" id="liveBadge">LIVE</div>
+      <video id="videoPlayer" controls autoplay muted crossorigin="anonymous">
+        Your browser does not support the video tag.
+      </video>
+    </div>
+
+    <script>
+      let hlsInstance = null;
+      let currentStreamId = null;
+      let streamCheckInterval = null;
+
+      // Get stream ID from URL path
+      const pathParts = window.location.pathname.split("/");
+      const streamId = pathParts[pathParts.length - 1];
+
+      if (!streamId || streamId === "player") {
+        showError("No stream ID provided");
+      } else {
+        currentStreamId = streamId;
+        loadStream();
+      }
+
+      async function checkStreamStatus() {
+        try {
+          const response = await fetch(`/api/v1/streams/${currentStreamId}`);
+          if (!response.ok) return;
+
+          const data = await response.json();
+          if (data.success && data.stream) {
+            // Check if stream is no longer running
+            if (
+              data.stream.status === "ended" ||
+              data.stream.status === "stopped"
+            ) {
+              showInfo("Stream has ended");
+              document.getElementById("liveBadge").style.display = "none";
+              if (hlsInstance) {
+                hlsInstance.stopLoad();
+              }
+              if (streamCheckInterval) {
+                clearInterval(streamCheckInterval);
+              }
+            }
+          }
+        } catch (err) {
+          console.log("Error checking stream status:", err);
+        }
+      }
+
+      async function loadStream() {
+        const loading = document.getElementById("loading");
+        loading.style.display = "block";
+
+        try {
+          // Get stream details to find HLS playlist URL
+          const response = await fetch(`/api/v1/streams/${currentStreamId}`);
+          if (!response.ok) {
+            throw new Error("Stream not found");
+          }
+
+          const data = await response.json();
+          if (!data.success || !data.stream) {
+            throw new Error("Invalid stream response");
+          }
+
+          const stream = data.stream;
+
+          // Check if stream has HLS playlist URL (from orchestrator/CDN)
+          let hlsUrl = null;
+
+          if (
+            stream.orchestrator &&
+            (stream.orchestrator.playlistURL ||
+              stream.orchestrator.playlist_url)
+          ) {
+            // Use CDN URL from orchestrator (check both camelCase and snake_case)
+            hlsUrl =
+              stream.orchestrator.playlistURL ||
+              stream.orchestrator.playlist_url;
+            showLiveBadge();
+          } else if (stream.hls_playlist_url) {
+            // Fallback to HLS playlist URL
+            hlsUrl = stream.hls_playlist_url;
+          } else if (stream.video_url && stream.video_url.includes(".m3u8")) {
+            // Use video URL if it's an M3U8
+            hlsUrl = stream.video_url;
+          }
+
+          if (!hlsUrl) {
+            // Playlist not ready yet, poll for it
+            console.log("Playlist not ready, polling...");
+            showInfo("Stream is starting, waiting for video...");
+            hlsUrl = await pollForPlaylist(currentStreamId);
+            if (hlsUrl) {
+              showLiveBadge();
+            }
+          }
+
+          console.log("Loading HLS stream from:", hlsUrl);
+          initializeHLSPlayer(hlsUrl);
+        } catch (error) {
+          console.error("Failed to load stream:", error);
+          showError("Failed to load stream: " + error.message);
+        } finally {
+          loading.style.display = "none";
+        }
+      }
+
+      async function pollForPlaylist(
+        streamId,
+        maxAttempts = 30,
+        interval = 2000
+      ) {
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+          try {
+            console.log(
+              `Polling for playlist... attempt ${attempt}/${maxAttempts}`
+            );
+
+            const response = await fetch(`/api/v1/streams/${streamId}`);
+            if (!response.ok) {
+              throw new Error("Stream not found");
+            }
+
+            const data = await response.json();
+            const stream = data.stream;
+
+            // Check for playlist URL (try both camelCase and snake_case)
+            if (
+              stream.orchestrator &&
+              (stream.orchestrator.playlistURL ||
+                stream.orchestrator.playlist_url)
+            ) {
+              const playlistUrl =
+                stream.orchestrator.playlistURL ||
+                stream.orchestrator.playlist_url;
+              console.log("Playlist URL found:", playlistUrl);
+              return playlistUrl;
+            } else if (stream.hls_playlist_url) {
+              console.log("HLS playlist URL found:", stream.hls_playlist_url);
+              return stream.hls_playlist_url;
+            }
+
+            // Wait before next attempt
+            if (attempt < maxAttempts) {
+              await new Promise((resolve) => setTimeout(resolve, interval));
+            }
+          } catch (error) {
+            console.error(`Polling attempt ${attempt} failed:`, error);
+            if (attempt < maxAttempts) {
+              await new Promise((resolve) => setTimeout(resolve, interval));
+            }
+          }
+        }
+
+        throw new Error(
+          "Stream is not ready. Please make sure the broadcaster has started."
+        );
+      }
+
+      function showInfo(message) {
+        const errorEl = document.getElementById("errorMessage");
+        if (errorEl) {
+          errorEl.textContent = message;
+          errorEl.style.display = "block";
+          errorEl.style.background = "#e0f2fe";
+          errorEl.style.color = "#0369a1";
+        }
+      }
+
+      function initializeHLSPlayer(url) {
+        const videoPlayer = document.getElementById("videoPlayer");
+
+        if (Hls.isSupported()) {
+          hlsInstance = new Hls({
+            debug: false,
+            enableWorker: true,
+            lowLatencyMode: true,
+            backBufferLength: 90,
+          });
+
+          hlsInstance.loadSource(url);
+          hlsInstance.attachMedia(videoPlayer);
+
+          hlsInstance.on(Hls.Events.MANIFEST_PARSED, function () {
+            console.log("HLS manifest parsed, starting playback");
+            videoPlayer.play().catch((e) => {
+              console.log("Autoplay prevented, user interaction required");
+              // Unmute and try again
+              videoPlayer.muted = false;
+            });
+
+            // Start checking stream status periodically
+            if (streamCheckInterval) {
+              clearInterval(streamCheckInterval);
+            }
+            streamCheckInterval = setInterval(checkStreamStatus, 5000); // Check every 5 seconds
+          });
+
+          hlsInstance.on(Hls.Events.ERROR, function (event, data) {
+            console.error("HLS error:", data);
+            if (data.fatal) {
+              switch (data.type) {
+                case Hls.ErrorTypes.NETWORK_ERROR:
+                  console.log("Network error, trying to recover...");
+                  hlsInstance.startLoad();
+                  break;
+                case Hls.ErrorTypes.MEDIA_ERROR:
+                  console.log("Media error, trying to recover...");
+                  hlsInstance.recoverMediaError();
+                  break;
+                default:
+                  showError("Fatal HLS error: " + data.details);
+                  hlsInstance.destroy();
+                  break;
+              }
+            } else if (data.details === "bufferStalledError") {
+              // Check if stream has ended
+              checkStreamStatus();
+            }
+          });
+
+          hlsInstance.on(Hls.Events.LEVEL_SWITCHED, function (event, data) {
+            console.log("Quality switched to level:", data.level);
+          });
+
+          // Listen for ended event
+          videoPlayer.addEventListener("ended", function () {
+            showInfo("Stream has ended");
+            document.getElementById("liveBadge").style.display = "none";
+          });
+        } else if (videoPlayer.canPlayType("application/vnd.apple.mpegurl")) {
+          // Native HLS support (Safari)
+          videoPlayer.src = url;
+          videoPlayer.play().catch((e) => {
+            console.log("Autoplay prevented");
+          });
+        } else {
+          showError("Your browser does not support HLS playback");
+        }
+      }
+
+      function showLiveBadge() {
+        document.getElementById("liveBadge").style.display = "block";
+      }
+
+      function showError(message) {
+        const errorEl = document.getElementById("errorMessage");
+        errorEl.textContent = message;
+        errorEl.style.display = "block";
+      }
+
+      // Cleanup on page unload
+      window.addEventListener("beforeunload", () => {
+        if (hlsInstance) {
+          hlsInstance.destroy();
+        }
+      });
+    </script>
+  </body>
+</html>

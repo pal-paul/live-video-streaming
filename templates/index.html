@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{.title}}</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+      }
+
+      .container {
+        max-width: 1200px;
+        width: 100%;
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        overflow: hidden;
+      }
+
+      .header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 40px;
+        text-align: center;
+      }
+
+      .header h1 {
+        font-size: 2.5em;
+        margin-bottom: 10px;
+      }
+
+      .header p {
+        font-size: 1.1em;
+        opacity: 0.9;
+      }
+
+      .content {
+        padding: 40px;
+      }
+
+      .quick-links {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 30px;
+        justify-content: center;
+      }
+
+      .link-btn {
+        padding: 12px 24px;
+        background: #667eea;
+        color: white;
+        text-decoration: none;
+        border-radius: 8px;
+        font-weight: 600;
+        transition: all 0.3s;
+        display: inline-block;
+      }
+
+      .link-btn:hover {
+        background: #5568d3;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+      }
+
+      .link-btn.secondary {
+        background: #10b981;
+      }
+
+      .link-btn.secondary:hover {
+        background: #059669;
+      }
+
+      .feature-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 30px;
+        margin-top: 30px;
+      }
+
+      .feature-card {
+        background: #f8f9fa;
+        border-radius: 15px;
+        padding: 30px;
+        text-align: center;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+      }
+
+      .feature-card:hover {
+        transform: translateY(-10px);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      }
+
+      .feature-card .icon {
+        font-size: 3em;
+        margin-bottom: 20px;
+      }
+
+      .feature-card h3 {
+        color: #667eea;
+        margin-bottom: 15px;
+        font-size: 1.5em;
+      }
+
+      .feature-card p {
+        color: #666;
+        line-height: 1.6;
+      }
+
+      .api-section {
+        margin-top: 50px;
+        background: #f8f9fa;
+        border-radius: 15px;
+        padding: 30px;
+      }
+
+      .api-section h2 {
+        color: #333;
+        margin-bottom: 20px;
+      }
+
+      .api-list {
+        list-style: none;
+      }
+
+      .api-list li {
+        background: white;
+        padding: 15px 20px;
+        margin-bottom: 10px;
+        border-radius: 8px;
+        border-left: 4px solid #667eea;
+        font-family: "Courier New", monospace;
+      }
+
+      .method {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 4px;
+        font-weight: bold;
+        margin-right: 10px;
+        font-size: 0.9em;
+      }
+
+      .method-post {
+        background: #28a745;
+        color: white;
+      }
+      .method-get {
+        background: #17a2b8;
+        color: white;
+      }
+      .method-delete {
+        background: #dc3545;
+        color: white;
+      }
+
+      .footer {
+        text-align: center;
+        padding: 20px;
+        color: #666;
+        font-size: 0.9em;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>🎥 Video Broadcast Service</h1>
+        <p>
+          Upload videos to cloud storage and broadcast to multiple concurrent
+          users
+        </p>
+      </div>
+
+      <div class="content">
+        <div class="quick-links">
+          <a href="/live" class="link-btn">📹 Start Live Broadcast</a>
+          <a href="/watch" class="link-btn secondary">👀 Watch Stream</a>
+        </div>
+
+        <div class="feature-grid">
+          <div class="feature-card">
+            <div class="icon">📹</div>
+            <h3>Live Camera Broadcast</h3>
+            <p>
+              Broadcast live from your camera with automatic recording and cloud
+              storage
+            </p>
+          </div>
+
+          <div class="feature-card">
+            <div class="icon">☁️</div>
+            <h3>Cloud Storage</h3>
+            <p>
+              Upload videos directly to Google Cloud Storage with automatic
+              metadata and signed URL generation
+            </p>
+          </div>
+
+          <div class="feature-card">
+            <div class="icon">📡</div>
+            <h3>Live Broadcasting</h3>
+            <p>
+              Create broadcast streams and deliver video content to unlimited
+              concurrent viewers
+            </p>
+          </div>
+
+          <div class="feature-card">
+            <div class="icon">📊</div>
+            <h3>Real-time Stats</h3>
+            <p>
+              Monitor viewer count, stream status, and detailed analytics in
+              real-time
+            </p>
+          </div>
+        </div>
+
+        <div class="api-section">
+          <h2>📚 API Endpoints</h2>
+
+          <h3 style="color: #667eea; margin-top: 20px;">Video Management</h3>
+          <ul class="api-list">
+            <li>
+              <span class="method method-post">POST</span>
+              <span>/api/v1/videos/upload</span> - Upload video to GCS
+            </li>
+            <li>
+              <span class="method method-get">GET</span>
+              <span>/api/v1/videos</span> - List all uploaded videos
+            </li>
+            <li>
+              <span class="method method-get">GET</span>
+              <span>/api/v1/videos/signed-url</span> - Generate signed URL
+            </li>
+            <li>
+              <span class="method method-delete">DELETE</span>
+              <span>/api/v1/videos</span> - Delete video from GCS
+            </li>
+          </ul>
+
+          <h3 style="color: #667eea; margin-top: 30px;">Broadcast Streaming</h3>
+          <ul class="api-list">
+            <li>
+              <span class="method method-post">POST</span>
+              <span>/api/v1/streams</span> - Create new broadcast stream
+            </li>
+            <li>
+              <span class="method method-get">GET</span>
+              <span>/api/v1/streams</span> - List all active streams
+            </li>
+            <li>
+              <span class="method method-post">POST</span>
+              <span>/api/v1/streams/:id/start</span> - Start broadcasting
+            </li>
+            <li>
+              <span class="method method-get">GET</span>
+              <span>/api/v1/streams/:id/watch</span> - Watch stream (SSE)
+            </li>
+            <li>
+              <span class="method method-get">GET</span>
+              <span>/api/v1/streams/:id/stats</span> - Get stream statistics
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer">
+        <p>Built with Gin Framework • Powered by Google Cloud Storage</p>
+      </div>
+    </div>
+  </body>
+</html>

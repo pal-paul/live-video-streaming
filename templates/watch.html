@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Stream Viewer - Video Broadcast Service</title>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          Oxygen, Ubuntu, Cantarell, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+
+      .header {
+        background: white;
+        padding: 20px 30px;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+      }
+
+      .header h1 {
+        color: #333;
+        font-size: 24px;
+        margin-bottom: 10px;
+      }
+
+      .stream-input {
+        display: flex;
+        gap: 10px;
+        margin-top: 15px;
+      }
+
+      .stream-input input {
+        flex: 1;
+        padding: 12px 16px;
+        border: 2px solid #e0e0e0;
+        border-radius: 6px;
+        font-size: 14px;
+        transition: border-color 0.3s;
+      }
+
+      .stream-input input:focus {
+        outline: none;
+        border-color: #667eea;
+      }
+
+      .btn {
+        padding: 12px 24px;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+      }
+
+      .btn-primary {
+        background: #667eea;
+        color: white;
+      }
+
+      .btn-primary:hover {
+        background: #5568d3;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+      }
+
+      .btn-danger {
+        background: #ef4444;
+        color: white;
+      }
+
+      .btn-danger:hover {
+        background: #dc2626;
+      }
+
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .stats-panel {
+        background: white;
+        padding: 20px 30px;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+        display: none;
+      }
+
+      .stats-panel.active {
+        display: block;
+      }
+
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-top: 15px;
+      }
+
+      .stat-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 15px;
+        border-radius: 8px;
+        color: white;
+      }
+
+      .stat-label {
+        font-size: 12px;
+        opacity: 0.9;
+        margin-bottom: 5px;
+      }
+
+      .stat-value {
+        font-size: 24px;
+        font-weight: bold;
+      }
+
+      .status-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+      }
+
+      .status-idle {
+        background: #f3f4f6;
+        color: #6b7280;
+      }
+
+      .status-streaming {
+        background: #10b981;
+        color: white;
+        animation: pulse 2s infinite;
+      }
+
+      .status-stopped {
+        background: #ef4444;
+        color: white;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.7;
+        }
+      }
+
+      .video-panel {
+        background: white;
+        padding: 20px 30px;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+        display: none;
+      }
+
+      .video-panel.active {
+        display: block;
+      }
+
+      .video-container {
+        background: #000;
+        border-radius: 8px;
+        overflow: hidden;
+        margin-top: 15px;
+        position: relative;
+        padding-bottom: 56.25%; /* 16:9 aspect ratio */
+      }
+
+      .video-container video {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+      }
+
+      .event-ended {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.95);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        z-index: 20;
+      }
+
+      .event-ended h1 {
+        color: white;
+        font-size: 48px;
+        margin-bottom: 20px;
+        font-weight: 600;
+      }
+
+      .event-ended p {
+        color: #999;
+        font-size: 18px;
+      }
+
+      .stream-data {
+        background: white;
+        padding: 20px 30px;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        display: none;
+      }
+
+      .stream-data.active {
+        display: block;
+      }
+
+      .stream-data h3 {
+        color: #333;
+        margin-bottom: 15px;
+      }
+
+      .data-log {
+        background: #1e293b;
+        color: #10b981;
+        padding: 15px;
+        border-radius: 6px;
+        font-family: "Courier New", monospace;
+        font-size: 13px;
+        max-height: 400px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+      }
+
+      .connection-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .connection-status.connected {
+        background: #d1fae5;
+        color: #065f46;
+      }
+
+      .connection-status.disconnected {
+        background: #fee2e2;
+        color: #991b1b;
+      }
+
+      .connection-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: currentColor;
+      }
+
+      .connected .connection-dot {
+        animation: blink 1.5s infinite;
+      }
+
+      @keyframes blink {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.3;
+        }
+      }
+
+      .error-message {
+        background: #fee2e2;
+        color: #991b1b;
+        padding: 15px;
+        border-radius: 6px;
+        margin-top: 15px;
+        display: none;
+      }
+
+      .error-message.active {
+        display: block;
+      }
+
+      .back-link {
+        display: inline-block;
+        color: #667eea;
+        text-decoration: none;
+        margin-bottom: 15px;
+        font-weight: 600;
+      }
+
+      .back-link:hover {
+        text-decoration: underline;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <a href="/" class="back-link">← Back to Home</a>
+        <h1>🎥 Stream Viewer</h1>
+        <p style="color: #666; margin-top: 5px;">
+          Watch live broadcasts in real-time
+        </p>
+
+        <div class="stream-input">
+          <input
+            type="text"
+            id="streamIdInput"
+            placeholder="Enter Stream ID or paste watch URL"
+          />
+          <button class="btn btn-primary" id="connectBtn">
+            Connect to Stream
+          </button>
+          <button
+            class="btn btn-danger"
+            id="disconnectBtn"
+            style="display: none;"
+          >
+            Disconnect
+          </button>
+        </div>
+
+        <div id="connectionStatus" style="margin-top: 15px; display: none;">
+          <span class="connection-status disconnected">
+            <span class="connection-dot"></span>
+            <span id="statusText">Disconnected</span>
+          </span>
+        </div>
+
+        <div id="errorMessage" class="error-message"></div>
+      </div>
+
+      <div class="stats-panel" id="statsPanel">
+        <h3 style="color: #333; margin-bottom: 5px;">Stream Statistics</h3>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">Status</div>
+            <div class="stat-value" id="statStatus">
+              <span class="status-badge status-idle">Idle</span>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Viewers</div>
+            <div class="stat-value" id="statViewers">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Uptime</div>
+            <div class="stat-value" id="statUptime">--</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Stream ID</div>
+            <div
+              class="stat-value"
+              id="statStreamId"
+              style="font-size: 12px; word-break: break-all;"
+            >
+              --
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="video-panel" id="videoPanel">
+        <h3 style="color: #333;">Video Player</h3>
+        <div class="video-container">
+          <div class="event-ended" id="eventEnded">
+            <h1>Event Ended</h1>
+            <p>Thank you for watching</p>
+          </div>
+          <video id="videoPlayer" controls crossorigin="anonymous">
+            <source id="videoSource" type="video/mp4" />
+            Your browser does not support the video tag.
+          </video>
+        </div>
+        <div
+          id="videoError"
+          style="
+            display: none;
+            color: #ef4444;
+            margin-top: 10px;
+            padding: 10px;
+            background: #fee2e2;
+            border-radius: 6px;
+          "
+        >
+          Unable to load video. The file may not be publicly accessible.
+        </div>
+      </div>
+
+      <div class="stream-data" id="streamData">
+        <h3>Stream Data (Real-time)</h3>
+        <div class="data-log" id="dataLog">Waiting for data...</div>
+      </div>
+    </div>
+
+    <script>
+      let eventSource = null;
+      let statsInterval = null;
+      let currentStreamId = null;
+      let currentVideoUrl = null; // Track currently loaded video URL
+      let hlsInstance = null; // Track HLS instance to prevent multiple instances
+
+      const streamIdInput = document.getElementById("streamIdInput");
+      const connectBtn = document.getElementById("connectBtn");
+      const disconnectBtn = document.getElementById("disconnectBtn");
+      const connectionStatus = document.getElementById("connectionStatus");
+      const statusText = document.getElementById("statusText");
+      const errorMessage = document.getElementById("errorMessage");
+      const statsPanel = document.getElementById("statsPanel");
+      const videoPanel = document.getElementById("videoPanel");
+      const streamData = document.getElementById("streamData");
+      const dataLog = document.getElementById("dataLog");
+
+      // Extract stream ID from URL path or query parameter
+      const pathParts = window.location.pathname.split("/");
+      const pathStreamId =
+        pathParts[pathParts.length - 1] !== "watch"
+          ? pathParts[pathParts.length - 1]
+          : null;
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlStreamId = urlParams.get("id");
+
+      // Prioritize path parameter, then query parameter
+      const autoConnectStreamId = pathStreamId || urlStreamId;
+
+      if (autoConnectStreamId) {
+        streamIdInput.value = autoConnectStreamId;
+        // Auto-connect after a short delay to ensure DOM is ready
+        setTimeout(() => connectToStream(), 100);
+      }
+
+      connectBtn.addEventListener("click", connectToStream);
+      disconnectBtn.addEventListener("click", disconnectFromStream);
+
+      streamIdInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") {
+          connectToStream();
+        }
+      });
+
+      function extractStreamId(input) {
+        // Extract stream ID from URL or use as is
+        const urlMatch = input.match(/streams\/([a-f0-9-]+)/i);
+        return urlMatch ? urlMatch[1] : input.trim();
+      }
+
+      function connectToStream() {
+        const input = streamIdInput.value;
+        if (!input) {
+          showError("Please enter a Stream ID");
+          return;
+        }
+
+        currentStreamId = extractStreamId(input);
+
+        // Close existing connection
+        disconnectFromStream();
+
+        // Show loading state
+        connectBtn.disabled = true;
+        connectBtn.textContent = "Connecting...";
+        hideError();
+
+        // Connect to SSE endpoint
+        eventSource = new EventSource(
+          `/api/v1/streams/${currentStreamId}/watch`
+        );
+
+        eventSource.onopen = () => {
+          console.log("Connected to stream");
+          connectionStatus.style.display = "block";
+          statusText.textContent = "Connected";
+          connectionStatus.querySelector(".connection-status").className =
+            "connection-status connected";
+
+          connectBtn.style.display = "none";
+          disconnectBtn.style.display = "inline-block";
+
+          statsPanel.classList.add("active");
+          streamData.classList.add("active");
+
+          // Start stats polling
+          fetchStats();
+          statsInterval = setInterval(fetchStats, 3000);
+        };
+
+        eventSource.onmessage = (event) => {
+          const timestamp = new Date().toLocaleTimeString();
+
+          try {
+            const data = JSON.parse(event.data);
+
+            // Handle different message types
+            if (data.type === "chunk") {
+              // Receive video chunk for live streaming (only if still connected)
+              if (eventSource && eventSource.readyState === 1) {
+                handleLiveChunk(data.data);
+              }
+            } else if (data.type === "stats") {
+              // Handle stats update
+              updateStats(data.stats);
+            } else {
+              // Log other messages
+              dataLog.textContent += `[${timestamp}] ${event.data}\n`;
+            }
+          } catch (e) {
+            // Not JSON, log as text
+            dataLog.textContent += `[${timestamp}] ${event.data}\n`;
+          }
+
+          dataLog.scrollTop = dataLog.scrollHeight;
+        };
+
+        eventSource.onerror = (error) => {
+          console.error("Stream error:", error);
+          // Only show error if EventSource is still trying to connect
+          // ReadyState 2 = CLOSED (normal closure)
+          if (eventSource && eventSource.readyState !== 2) {
+            showError(
+              "Failed to connect to stream. Please check the Stream ID and try again."
+            );
+          } else {
+            console.log("Stream connection closed normally");
+          }
+          disconnectFromStream();
+        };
+      }
+
+      function disconnectFromStream() {
+        if (eventSource) {
+          eventSource.close();
+          eventSource = null;
+        }
+
+        if (statsInterval) {
+          clearInterval(statsInterval);
+          statsInterval = null;
+        }
+
+        // Destroy HLS instance if exists
+        if (hlsInstance) {
+          console.log("Destroying HLS instance on disconnect");
+          hlsInstance.destroy();
+          hlsInstance = null;
+        }
+
+        // Clean up MediaSource if exists
+        if (mediaSource && mediaSource.readyState === "open") {
+          try {
+            mediaSource.endOfStream();
+          } catch (e) {
+            console.log("MediaSource already ended:", e.message);
+          }
+        }
+        mediaSource = null;
+        sourceBuffer = null;
+        liveChunksQueue = [];
+        firstChunkAppended = false;
+
+        // Reset current video URL so it can reload on reconnect
+        currentVideoUrl = null;
+
+        connectionStatus.querySelector(".connection-status").className =
+          "connection-status disconnected";
+        statusText.textContent = "Disconnected";
+
+        connectBtn.disabled = false;
+        connectBtn.textContent = "Connect to Stream";
+        connectBtn.style.display = "inline-block";
+        disconnectBtn.style.display = "none";
+      }
+
+      async function fetchStats() {
+        if (!currentStreamId) return;
+
+        try {
+          const response = await fetch(
+            `/api/v1/streams/${currentStreamId}/stats`
+          );
+          if (!response.ok) throw new Error("Failed to fetch stats");
+
+          const data = await response.json();
+          if (data.success && data.stats) {
+            updateStats(data.stats);
+          }
+        } catch (error) {
+          console.error("Stats error:", error);
+        }
+      }
+
+      function updateStats(stats) {
+        // Check if stream has stopped
+        if (stats.status === "stopped") {
+          showEventEnded();
+          return;
+        }
+
+        // Update status
+        const statusBadge = document
+          .getElementById("statStatus")
+          .querySelector(".status-badge");
+        statusBadge.textContent = stats.status;
+        statusBadge.className = `status-badge status-${stats.status}`;
+
+        // Update viewer count
+        document.getElementById("statViewers").textContent =
+          stats.viewer_count || 0;
+
+        // Update uptime
+        if (stats.uptime_seconds) {
+          const hours = Math.floor(stats.uptime_seconds / 3600);
+          const minutes = Math.floor((stats.uptime_seconds % 3600) / 60);
+          const seconds = Math.floor(stats.uptime_seconds % 60);
+          document.getElementById(
+            "statUptime"
+          ).textContent = `${hours}h ${minutes}m ${seconds}s`;
+        } else {
+          document.getElementById("statUptime").textContent = "--";
+        }
+
+        // Update stream ID
+        document.getElementById("statStreamId").textContent =
+          stats.id || currentStreamId;
+
+        // Update video player if video URL is available and not already loaded
+        if (stats.video_url && stats.video_url !== currentVideoUrl) {
+          console.log(
+            "[updateStats] Loading video - URL changed from",
+            currentVideoUrl,
+            "to",
+            stats.video_url
+          );
+
+          // Check if this is a live stream
+          if (stats.video_url === "live://streaming") {
+            loadLiveStream();
+          } else {
+            loadVideo(stats.video_url, stats.gcs_path, stats.current_position);
+          }
+          videoPanel.classList.add("active");
+        } else if (stats.video_url && stats.video_url === currentVideoUrl) {
+          console.log(
+            "[updateStats] Skipping reload - same video URL:",
+            stats.video_url
+          );
+          // Don't reload live streams - they're already streaming
+          if (stats.video_url === "live://streaming") {
+            return;
+          }
+          // Update position if needed for live sync
+          if (stats.current_position !== undefined) {
+            syncVideoPosition(stats.current_position);
+          }
+        } else if (!stats.video_url && !currentVideoUrl) {
+          // Try to fetch video URL from stream endpoint only if no video loaded yet
+          fetchVideoUrl();
+        }
+      }
+
+      function syncVideoPosition(targetPosition) {
+        const videoPlayer = document.getElementById("videoPlayer");
+        if (!videoPlayer || !targetPosition) return;
+
+        // Only sync if difference is more than 2 seconds (avoid constant seeking)
+        const currentPos = videoPlayer.currentTime;
+        const diff = Math.abs(currentPos - targetPosition);
+
+        if (diff > 2 && diff < 30) {
+          // Don't sync if too far apart (might be intentional)
+          console.log(
+            `[syncVideoPosition] Syncing from ${currentPos}s to ${targetPosition}s`
+          );
+          videoPlayer.currentTime = targetPosition;
+        }
+      }
+
+      async function loadVideo(videoUrl, gcsPath, startPosition) {
+        console.log(
+          "[loadVideo] Called with:",
+          videoUrl,
+          "current:",
+          currentVideoUrl
+        );
+
+        // Check if this exact video is already loaded - prevent reload
+        if (currentVideoUrl === videoUrl) {
+          console.log("[loadVideo] SKIPPED - Video already loaded:", videoUrl);
+          return;
+        }
+
+        // Set currentVideoUrl immediately to prevent race conditions
+        currentVideoUrl = videoUrl;
+        console.log(
+          "[loadVideo] PROCEEDING - Set currentVideoUrl to:",
+          currentVideoUrl
+        );
+
+        const videoPlayer = document.getElementById("videoPlayer");
+        const videoSource = document.getElementById("videoSource");
+        const videoError = document.getElementById("videoError");
+
+        console.log("[loadVideo] Loading video from:", videoUrl);
+        console.log("[loadVideo] GCS Path:", gcsPath);
+
+        // Detect if URL is HLS (.m3u8)
+        const isHLS = videoUrl.includes(".m3u8");
+
+        // Use the videoUrl directly - it's already a proxy URL for HLS
+        let finalUrl = videoUrl;
+
+        // For non-HLS files in private bucket, try to get signed URL
+        if (gcsPath && !isHLS && !videoUrl.startsWith("/api/")) {
+          try {
+            const signedResponse = await fetch(
+              `/api/v1/videos/signed-url?path=${encodeURIComponent(
+                gcsPath
+              )}&expiration=1h`
+            );
+            if (signedResponse.ok) {
+              const signedData = await signedResponse.json();
+              if (signedData.success && signedData.signed_url) {
+                finalUrl = signedData.signed_url;
+                console.log("Using signed URL for private bucket access");
+              }
+            }
+          } catch (err) {
+            console.log("Could not get signed URL, using direct URL:", err);
+          }
+        }
+
+        videoError.style.display = "none";
+
+        if (isHLS && Hls.isSupported()) {
+          // Only destroy and recreate if we don't have an instance or need a different source
+          if (hlsInstance) {
+            console.log("Destroying previous HLS instance");
+            hlsInstance.destroy();
+            hlsInstance = null;
+          }
+
+          // Use hls.js for HLS playback
+          console.log("Using HLS.js for HLS playback");
+          hlsInstance = new Hls({
+            debug: false,
+            enableWorker: true,
+            lowLatencyMode: false,
+          });
+          hlsInstance.loadSource(finalUrl);
+          hlsInstance.attachMedia(videoPlayer);
+          hlsInstance.on(Hls.Events.MANIFEST_PARSED, function () {
+            console.log("HLS manifest loaded, ready to play");
+
+            // Seek to broadcast position if provided
+            if (startPosition && startPosition > 0) {
+              console.log(
+                `[loadVideo] Seeking to broadcast position: ${startPosition}s`
+              );
+              videoPlayer.currentTime = startPosition;
+            }
+
+            videoPlayer
+              .play()
+              .catch((e) => console.log("Autoplay prevented:", e));
+          });
+          hlsInstance.on(Hls.Events.ERROR, function (event, data) {
+            console.error("HLS error:", data);
+            if (data.fatal) {
+              videoError.style.display = "block";
+              videoError.innerHTML = `<strong>HLS Error:</strong> ${data.type} - ${data.details}`;
+            }
+          });
+        } else if (
+          isHLS &&
+          videoPlayer.canPlayType("application/vnd.apple.mpegurl")
+        ) {
+          // Native HLS support (Safari)
+          console.log("Using native HLS playback");
+          videoSource.src = finalUrl;
+          videoSource.type = "application/vnd.apple.mpegurl";
+          videoPlayer.load();
+
+          // Seek after video can play
+          videoPlayer.onloadedmetadata = () => {
+            if (startPosition && startPosition > 0) {
+              console.log(
+                `[loadVideo] Seeking to broadcast position: ${startPosition}s`
+              );
+              videoPlayer.currentTime = startPosition;
+            }
+            videoPlayer
+              .play()
+              .catch((e) => console.log("Autoplay prevented:", e));
+          };
+        } else if (!isHLS) {
+          // Regular video playback
+          console.log("Using regular video playback");
+          videoSource.src = finalUrl;
+          videoSource.type = "video/mp4";
+          videoPlayer.load();
+        } else {
+          console.error("HLS not supported in this browser");
+          videoError.style.display = "block";
+          videoError.innerHTML =
+            "<strong>Error:</strong> HLS playback not supported in this browser.";
+        }
+
+        // Load the video
+        if (videoSource.src !== finalUrl) {
+          videoSource.src = finalUrl;
+          videoPlayer.load();
+
+          // Add error handler
+          videoPlayer.onerror = (e) => {
+            console.error("Video load error:", e);
+            videoError.style.display = "block";
+            videoError.innerHTML = `
+              Unable to load video. Please check:<br>
+              • CORS is enabled on the GCS bucket<br>
+              • Video file exists and is accessible<br>
+              • Browser console for more details
+            `;
+          };
+
+          videoPlayer.onloadeddata = () => {
+            videoError.style.display = "none";
+            console.log("Video loaded successfully");
+          };
+
+          // Video will loop automatically based on server timeline
+          // Check if stream has ended when video ends
+          videoPlayer.onended = () => {
+            checkStreamStatus();
+          };
+
+          // Try to play after a short delay
+          setTimeout(() => {
+            videoPlayer.play().catch((err) => {
+              console.log(
+                "Autoplay prevented, user must click play:",
+                err.message
+              );
+            });
+          }, 100);
+        }
+      }
+
+      async function fetchVideoUrl() {
+        if (!currentStreamId) return;
+
+        try {
+          const response = await fetch(`/api/v1/streams/${currentStreamId}`);
+          if (!response.ok) return;
+
+          const data = await response.json();
+          if (data.success && data.stream) {
+            const streamData = data.stream;
+            if (
+              streamData.video_url &&
+              streamData.video_url !== currentVideoUrl
+            ) {
+              console.log(
+                "[fetchVideoUrl] Loading video - URL:",
+                streamData.video_url
+              );
+              loadVideo(
+                streamData.video_url,
+                streamData.gcs_path,
+                streamData.current_position
+              );
+              videoPanel.classList.add("active");
+            }
+          }
+        } catch (error) {
+          console.error("Failed to fetch video URL:", error);
+        }
+      }
+
+      function showError(message) {
+        errorMessage.textContent = message;
+        errorMessage.classList.add("active");
+      }
+
+      function hideError() {
+        errorMessage.classList.remove("active");
+      }
+
+      async function checkStreamStatus() {
+        if (!currentStreamId) return;
+
+        try {
+          const response = await fetch(
+            `/api/v1/streams/${currentStreamId}/stats`
+          );
+          if (!response.ok) throw new Error("Failed to fetch stats");
+
+          const data = await response.json();
+          if (data.success && data.stats && data.stats.status === "stopped") {
+            showEventEnded();
+          }
+        } catch (error) {
+          console.error("Failed to check stream status:", error);
+        }
+      }
+
+      function showEventEnded() {
+        const eventEnded = document.getElementById("eventEnded");
+        const videoPlayer = document.getElementById("videoPlayer");
+
+        if (eventEnded) {
+          eventEnded.style.display = "flex";
+          videoPlayer.pause();
+        }
+
+        // Disconnect from stream
+        disconnectFromStream();
+      }
+
+      let mediaSource = null;
+      let sourceBuffer = null;
+      let liveChunksQueue = [];
+      let firstChunkAppended = false;
+      let currentChunkBlob = null;
+      let allChunks = []; // Accumulate all chunks
+      let isLiveStreamStarted = false;
+
+      function loadLiveStream() {
+        console.log("[loadLiveStream] Starting live stream viewer");
+        currentVideoUrl = "live://streaming";
+
+        const videoError = document.getElementById("videoError");
+        videoError.style.display = "none";
+
+        console.log(
+          "[loadLiveStream] Ready to receive chunks via blob accumulation"
+        );
+      }
+
+      function handleLiveChunk(base64Data) {
+        // Silently ignore chunks if we're no longer connected
+        if (!eventSource || eventSource.readyState !== 1) {
+          return;
+        }
+
+        try {
+          // Decode base64 to Blob
+          const binaryString = atob(base64Data);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+
+          console.log(
+            "[handleLiveChunk] Received chunk:",
+            bytes.length,
+            "bytes"
+          );
+
+          // Check WebM signature (should start with 0x1A 0x45 0xDF 0xA3)
+          if (bytes.length > 4) {
+            const signature = `${bytes[0].toString(16)} ${bytes[1].toString(
+              16
+            )} ${bytes[2].toString(16)} ${bytes[3].toString(16)}`;
+            console.log("[handleLiveChunk] First 4 bytes:", signature);
+          }
+
+          // Create blob from chunk and add to collection
+          const blob = new Blob([bytes], { type: "video/webm" });
+          allChunks.push(blob);
+
+          console.log("[handleLiveChunk] Total chunks:", allChunks.length);
+
+          // Update video with accumulated chunks
+          if (!isLiveStreamStarted) {
+            isLiveStreamStarted = true;
+          }
+          playAccumulatedChunks();
+        } catch (error) {
+          console.error("[handleLiveChunk] Error processing chunk:", error);
+        }
+      }
+
+      function playAccumulatedChunks() {
+        if (allChunks.length === 0) return;
+
+        const videoPlayer = document.getElementById("videoPlayer");
+        const currentTime = videoPlayer.currentTime;
+        const wasPlaying = !videoPlayer.paused;
+
+        // Revoke previous blob URL to prevent memory leak
+        if (currentChunkBlob) {
+          URL.revokeObjectURL(currentChunkBlob);
+        }
+
+        // Combine all chunks - MediaRecorder fragments can be concatenated
+        const combinedBlob = new Blob(allChunks, { type: "video/webm" });
+        currentChunkBlob = URL.createObjectURL(combinedBlob);
+
+        console.log(
+          "[playAccumulatedChunks] Created video from",
+          allChunks.length,
+          "chunks, total size:",
+          combinedBlob.size,
+          "bytes"
+        );
+
+        // Set up event listeners before changing source
+        videoPlayer.onloadedmetadata = () => {
+          console.log(
+            "[playAccumulatedChunks] Video metadata loaded, duration:",
+            videoPlayer.duration
+          );
+
+          // Restore playback position if we were already playing
+          if (currentTime > 0 && currentTime < videoPlayer.duration) {
+            videoPlayer.currentTime = currentTime;
+            console.log(
+              "[playAccumulatedChunks] Restored position to",
+              currentTime
+            );
+          }
+        };
+
+        videoPlayer.oncanplay = () => {
+          console.log("[playAccumulatedChunks] Video can play");
+
+          // Auto-play for first chunk or resume if was playing
+          if (allChunks.length === 1 || wasPlaying) {
+            videoPlayer.play().catch((e) => {
+              console.log(
+                "[playAccumulatedChunks] Autoplay prevented:",
+                e.message
+              );
+            });
+          }
+        };
+
+        videoPlayer.onerror = (e) => {
+          const error = videoPlayer.error;
+          console.error(
+            "[playAccumulatedChunks] Video error:",
+            "code:",
+            error?.code,
+            "message:",
+            error?.message,
+            "MEDIA_ERR_ABORTED:",
+            error?.MEDIA_ERR_ABORTED,
+            "MEDIA_ERR_NETWORK:",
+            error?.MEDIA_ERR_NETWORK,
+            "MEDIA_ERR_DECODE:",
+            error?.MEDIA_ERR_DECODE,
+            "MEDIA_ERR_SRC_NOT_SUPPORTED:",
+            error?.MEDIA_ERR_SRC_NOT_SUPPORTED
+          );
+
+          // Try to download and check the blob
+          if (currentChunkBlob && allChunks.length === 1) {
+            console.log(
+              "[playAccumulatedChunks] Blob URL for debugging:",
+              currentChunkBlob
+            );
+            console.log(
+              "[playAccumulatedChunks] Blob type:",
+              allChunks[0].type
+            );
+            console.log(
+              "[playAccumulatedChunks] Blob size:",
+              allChunks[0].size
+            );
+          }
+        };
+
+        // Update video source
+        videoPlayer.src = currentChunkBlob;
+      }
+
+      // Auto-connect if stream ID is in URL
+      if (urlStreamId) {
+        setTimeout(connectToStream, 500);
+      }
+    </script>
+  </body>
+</html>
