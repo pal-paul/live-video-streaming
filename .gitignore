@@ -1,4 +1,5 @@
 # Binaries for programs and plugins
+bin/
 *.exe
 *.exe~
 *.dll
@@ -22,6 +23,13 @@ hls/
 *.m3u8
 *.ts
 
+# Temporary directories
+/tmp/
+/temp/
+
+# WebRTC ingest files
+webrtc-ingest/
+
 # Environment files
 .env
 *.key
@@ -41,4 +49,6 @@ Thumbs.db
 
 # Data directory for video frames
 data/
-.env
+
+# Push script (optional)
+push-to-github.sh
