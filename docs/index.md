@@ -21,14 +21,14 @@ This service provides a complete live streaming solution that:
 2. Transcodes video to multiple quality levels using FFmpeg
 3. Packages as HLS segments
 4. Uploads to Google Cloud Storage
-5. Delivers via Ingka CDN
+5. Delivers via CDN
 
 **Stack:**
 - Backend: Go 1.21+ with Gin web framework
 - WebRTC: pion/webrtc v3.3.6
 - Transcoding: FFmpeg (VP8 → H.264 ABR ladder)
 - Storage: Google Cloud Storage
-- Delivery: Ingka CDN (https://cdn.dev-vugc.ingka.com)
+- Delivery: CDN (configurable)
 - Player: HLS.js
 
 ## Architecture
@@ -59,7 +59,7 @@ This service provides a complete live streaming solution that:
                                                │
                                                ▼
                                         ┌──────────────┐
-                                        │  Ingka CDN   │
+                                        │     CDN      │
                                         └──────┬───────┘
                                                │ HLS Playlist
                                                ▼
@@ -97,13 +97,13 @@ This service provides a complete live streaming solution that:
    - Real-time upload as files are created
 
 5. **GCS Storage** (`pkg/storage/gcs.go`)
-   - Bucket: `ingka-vugc-infra-dev-assets`
+   - Bucket: Configured via environment variable
    - Path: `upload/videos/{streamID}/{variant}/`
    - Uniform bucket-level access (no object ACLs)
 
 6. **CDN Delivery**
-   - Base URL: `https://cdn.dev-vugc.ingka.com`
-   - Playlist: `/preview/video/{streamID}/playlist.m3u8`
+   - Base URL: Configured via `CDN_BASE_URL` environment variable
+   - Playlist: `/{streamID}/playlist.m3u8`
    - CORS configured on load balancer
 
 ## Features
@@ -150,8 +150,10 @@ This service provides a complete live streaming solution that:
 4. **Environment Variables**
    ```bash
    # .env file
-   GCS_BUCKET_NAME=ingka-vugc-infra-dev-assets
+   GCS_BUCKET_NAME=your-gcs-bucket-name
    GCS_PROJECT_ID=your-project-id
+   GCS_SERVICE_ACCOUNT=your-service-account@project.iam.gserviceaccount.com
+   CDN_BASE_URL=https://cdn.example.com
    PORT=8080
    ```
 
@@ -234,7 +236,7 @@ GET /api/v1/streams/{id}
       "streamID": "uuid",
       "running": true,
       "outputPath": "/tmp/hls/uuid",
-      "playlistURL": "https://cdn.dev-vugc.ingka.com/preview/video/uuid/playlist.m3u8"
+      "playlistURL": "https://cdn.example.com/uuid/playlist.m3u8"
     }
   }
 }
@@ -309,8 +311,8 @@ type FFmpegConfig struct {
 
 ### GCS Configuration
 
-- Bucket: `ingka-vugc-infra-dev-assets`
-- Region: Multi-region
+- Bucket: Set via `GCS_BUCKET_NAME` environment variable
+- Region: Multi-region (recommended)
 - Access: Uniform bucket-level
 - Path structure: `upload/videos/{streamID}/{variant}/{file}`
 
@@ -374,7 +376,8 @@ go test ./...
 
 ```bash
 # Set environment
-export GCS_BUCKET_NAME=ingka-vugc-infra-dev-assets
+export GCS_BUCKET_NAME=your-gcs-bucket-name
+export CDN_BASE_URL=https://cdn.example.com
 export PORT=8080
 
 # Run server
@@ -408,7 +411,7 @@ export PORT=8080
 **Solution:**
 1. Check stream status: `GET /api/v1/streams/{id}`
 2. Verify orchestrator running: `"running": true`
-3. Check GCS uploads: `gsutil ls gs://ingka-vugc-infra-dev-assets/upload/videos/{streamID}/`
+3. Check GCS uploads: `gsutil ls gs://your-bucket-name/upload/videos/{streamID}/`
 4. Test CDN URL directly in browser
 
 ### Buffer Stalling Errors
@@ -491,11 +494,11 @@ curl http://localhost:8080/api/v1/streams/{id}
 
 ## License
 
-Copyright © 2025 Ingka Group
+MIT License
 
 ## Support
 
 For issues and questions:
 - Check [Troubleshooting](#troubleshooting)
 - Review [Architecture Documentation](./ARCHITECTURE.md)
-- Contact: DevOps team
+- Open an issue on GitHub

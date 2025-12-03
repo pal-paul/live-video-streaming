@@ -63,4 +63,4 @@ live-video/
 
 ## License
 
-Copyright © 2025 Ingka Group
+MIT License

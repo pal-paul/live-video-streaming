@@ -48,7 +48,7 @@ type GCSConfig struct {
 	SegmentLifetime int    `json:"segment_lifetime"` // Hours to keep segments
 }
 
-// DefaultFFmpegConfig returns default configuration with Ingka CDN
+// DefaultFFmpegConfig returns default configuration
 func DefaultFFmpegConfig() *FFmpegConfig {
 	return &FFmpegConfig{
 		SegmentDuration: 4,

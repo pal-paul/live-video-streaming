@@ -3,6 +3,7 @@ package handlers
 import (
 	"io"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -23,7 +24,11 @@ func (h *HLSProxyHandler) ProxyCDN(c *gin.Context) {
 	path := c.Param("path")
 
 	// Build the CDN URL
-	cdnURL := "https://cdn.dev-vugc.ingka.com/preview/video/" + strings.TrimPrefix(path, "/")
+	cdnBaseURL := os.Getenv("CDN_BASE_URL")
+	if cdnBaseURL == "" {
+		cdnBaseURL = "https://cdn.example.com"
+	}
+	cdnURL := cdnBaseURL + "/" + strings.TrimPrefix(path, "/")
 
 	// Fetch from CDN
 	resp, err := http.Get(cdnURL)

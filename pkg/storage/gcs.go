@@ -283,7 +283,12 @@ func (g *GCSService) UploadHLSPlaylist(localPath, streamID, variantName string) 
 // GetHLSMasterPlaylistURL returns the URL for the HLS master playlist
 func (g *GCSService) GetHLSMasterPlaylistURL(streamID string) string {
 	// Direct CDN URL (CORS configured on load balancer)
-	return fmt.Sprintf("https://cdn.dev-vugc.ingka.com/preview/video/%s/playlist.m3u8", streamID)
+	// Replace with your CDN URL
+	cdnBaseURL := os.Getenv("CDN_BASE_URL")
+	if cdnBaseURL == "" {
+		cdnBaseURL = "https://cdn.example.com"
+	}
+	return fmt.Sprintf("%s/%s/playlist.m3u8", cdnBaseURL, streamID)
 }
 
 // DeleteOldHLSSegments deletes HLS segments older than the specified duration
