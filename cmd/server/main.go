@@ -18,7 +18,7 @@ import (
 func main() {
 	// Load configuration from environment
 	port := getEnv("PORT", "8080")
-	gcsBucket := getEnv("GCS_BUCKET", "ingka-vugc-infra-dev-assets")
+	gcsBucket := getEnv("GCS_BUCKET_NAME", "your-gcs-bucket-name")
 	gcsCredentials := getEnv("GCS_CREDENTIALS_FILE", "")
 	videoFolder := getEnv("VIDEO_FOLDER", "upload/videos")
 
